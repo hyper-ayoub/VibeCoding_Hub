@@ -1,4 +1,5 @@
 # IP Address Lookup Tool
+![image](https://github.com/user-attachments/assets/fa83e194-f1b9-414b-bccd-d3335eadbf35)
 
 ---
 
@@ -68,9 +69,18 @@ This is a simple, yet powerful web application designed to help users quickly lo
 
 ## Screenshots
 
-Below is a conceptual image representing the project. You might want to replace this with an actual screenshot of the running application for your `README.md`.
+Below is a conceptual image representing the project. You might want to replace this with an actual screenshot of the running application
+
+![m1p1-09-gemini-6](https://github.com/user-attachments/assets/90d5b072-d897-4945-a094-2c7bcc5a65e5)
 
 ---
+## correct code 
+// Correct from docs
+
+               <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+                   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+                 crossorigin="">
+             </script>
 
 ## Contributing
 
