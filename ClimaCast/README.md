@@ -2,6 +2,7 @@
 
 ClimaCast is a modern, mobile-inspired weather application that allows users to get current weather conditions and a 7-day forecast for any location worldwide. It also dynamically displays the flag of the country associated with the entered locations, Fast and Easy Access.
 ## ✨ Features
+![image](https://github.com/user-attachments/assets/f354cc6e-5f39-434e-b04b-0cbcafdefe17)
 
 * **Location-Based Weather:** Get real-time weather and forecast data by entering a city, country, or even a ZIP/postal code.
 * **7-Day Forecast:** View upcoming weather conditions for the next week.
