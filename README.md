@@ -1,5 +1,5 @@
 # VibeCodeHub
-## Projects exploring VBO coding techniques, optimizing performance, and streamlining workflows
+## Projects exploring VBO coding techniques, optimizing performance, and streamlining Workflows
 
 
 ![BCO bfee7346-f06d-4829-a8ab-ee6b211d33cb](https://github.com/user-attachments/assets/eed7c88c-e2d7-4d29-b6ee-326c932a9794)
