@@ -10,7 +10,7 @@ const App = () => {
     const [flagUrl, setFlagUrl] = useState(''); // Stores the URL for the location's flag
 
     // Your Visual Crossing API Key
-    const API_KEY = '9LPLGS4LY8K84NSEHH9MVKM5V';
+    const API_KEY = 'YOUR_API_KEY';
 
     // Function to fetch weather data from Visual Crossing API
     const fetchWeather = async () => {
