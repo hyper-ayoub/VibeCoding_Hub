@@ -1,1 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Data Fetcher SPA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chosen Palette: Warm Neutrals -->
+    <!-- Application Structure Plan: The application is structured as a single-page dashboard. The layout is divided into a control panel for user interaction (start/stop fetching, interval adjustment, data analysis), a real-time data log, and a dynamic line chart for data visualization, and a new section for LLM-generated data insights. This structure provides a clear and intuitive user flow, allowing users to control the data simulation, immediately see the results, and gain AI-powered insights. This dashboard approach was chosen for its efficiency in presenting real-time data and controls in a single, cohesive view, augmented with interpretive AI capabilities. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Simulated real-time data points with timestamps and random values.
+        - Goal: To display the raw data as it's fetched, visualize the trend, and provide AI-generated summaries/insights based on the data.
+        - Viz/Presentation Method: A vertically scrolling list for the raw data log, a line chart for visualization, and a text block for AI insights.
+        - Interaction: Users can start and stop the data fetching process, adjust the fetching interval, and trigger an AI analysis of the current data.
+        - Justification: The scrolling list provides a clear, chronological record. The line chart offers an immediate visual representation of trends. The AI insight feature enhances understanding by summarizing observed patterns, making the data more consumable and actionable.
+        - Library/Method: Chart.js (Canvas) for the line chart, Gemini API (gemini-2.0-flash) for AI insights.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
 
+    <div class="container mx-auto p-4 sm:p-6 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Real-Time Data Simulation</h1>
+            <p class="text-lg text-gray-600 mt-2">An interactive dashboard to simulate and visualize live data streams.</p>
+        </header>
+
+        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+            <h2 class="text-2xl font-semibold mb-4 text-center">Controls</h2>
+            <div class="flex flex-wrap justify-center items-center gap-4">
+                <button id="startBtn" class="px-6 py-3 rounded-md font-bold text-white bg-green-500 hover:bg-green-600 transition-colors duration-300 disabled:bg-gray-400">Start Fetching</button>
+                <button id="stopBtn" class="px-6 py-3 rounded-md font-bold text-white bg-red-500 hover:bg-red-600 transition-colors duration-300 disabled:bg-gray-400" disabled>Stop Fetching</button>
+                <div class="flex items-center space-x-2">
+                    <label for="interval" class="font-medium">Interval (ms):</label>
+                    <input type="number" id="interval" value="1000" min="100" step="100" class="w-24 px-2 py-1 border rounded-md">
+                </div>
+                <button id="analyzeBtn" class="px-6 py-3 rounded-md font-bold text-white bg-blue-500 hover:bg-blue-600 transition-colors duration-300 disabled:bg-gray-400">Analyze Data ✨</button>
+            </div>
+        </div>
+
+        <div id="error-container" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-6" role="alert">
+            <strong class="font-bold">Error:</strong>
+            <span id="error-message" class="block sm:inline"></span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div class="md:col-span-1 bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-semibold mb-4">Data Log</h2>
+                <ul id="data-list" class="list-none p-0 max-h-96 overflow-y-auto border border-gray-200 rounded-lg bg-gray-50 divide-y divide-gray-100">
+                    <li id="no-data" class="text-gray-500 italic p-4">No data fetched yet.</li>
+                </ul>
+            </div>
+            <div class="md:col-span-2 bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-semibold mb-4">Data Visualization</h2>
+                <div class="chart-container">
+                    <canvas id="dataChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-md mt-8">
+            <h2 class="text-2xl font-semibold mb-4">AI Data Insights</h2>
+            <div id="insight-display" class="min-h-[100px] border border-gray-200 rounded-lg bg-gray-50 p-4 text-gray-700 italic flex items-center justify-center text-center">
+                Click "Analyze Data ✨" to get insights from the AI.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const intervalInput = document.getElementById('interval');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const dataList = document.getElementById('data-list');
+        const noData = document.getElementById('no-data');
+        const errorContainer = document.getElementById('error-container');
+        const errorMessage = document.getElementById('error-message');
+        const insightDisplay = document.getElementById('insight-display');
+
+        let isFetching = false;
+        let intervalId = null;
+        let data = []; // Stores the full data points (id, value, timestamp)
+        let chart;
+
+        // Keep track of the last value to simulate a trend
+        let lastValue = 50; 
+
+        const fetchData = () => {
+            if (Math.random() < 0.1) {
+                showError('Failed to fetch data!');
+                return;
+            }
+            hideError();
+            
+            // --- MODIFIED DATA GENERATION LOGIC ---
+            // Simulate an increasing trend with some randomness
+            const trendChange = (Math.random() * 5) - 2; // Adds between -2 and +3
+            lastValue = Math.max(0, Math.min(100, lastValue + trendChange)); // Keep value between 0 and 100
+            
+            const newDataPoint = {
+                id: Date.now() + Math.random(),
+                value: lastValue,
+                timestamp: new Date().toLocaleTimeString(),
+            };
+            // --- END MODIFIED DATA GENERATION LOGIC ---
+
+            data.push(newDataPoint);
+            updateDataList(newDataPoint);
+            updateChart(newDataPoint);
+        };
+
+        const updateDataList = (item) => {
+            if (noData) {
+                noData.style.display = 'none';
+            }
+            const listItem = document.createElement('li');
+            listItem.className = 'text-base py-2 px-4 flex justify-between items-center hover:bg-gray-100 transition duration-150';
+            listItem.innerHTML = `<span class="text-gray-700 font-mono">${item.timestamp}</span><span class="text-blue-600 font-bold">${item.value.toFixed(2)}</span>`;
+            dataList.prepend(listItem);
+        };
+
+        const showError = (message) => {
+            errorMessage.textContent = message;
+            errorContainer.classList.remove('hidden');
+        };
+
+        const hideError = () => {
+            if (!errorContainer.classList.contains('hidden')) {
+                errorContainer.classList.add('hidden');
+            }
+        };
+
+        const startFetching = () => {
+            if (isFetching) return;
+            isFetching = true;
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            intervalInput.disabled = true;
+            analyzeBtn.disabled = true; // Disable analyze while fetching actively
+            hideError();
+
+            const interval = parseInt(intervalInput.value, 10) || 1000;
+            intervalId = setInterval(fetchData, interval);
+        };
+
+        const stopFetching = () => {
+            if (!isFetching) return;
+            isFetching = false;
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            intervalInput.disabled = false;
+            analyzeBtn.disabled = false; // Enable analyze after fetching stops
+            clearInterval(intervalId);
+            intervalId = null;
+        };
+        
+        const createChart = () => {
+            const ctx = document.getElementById('dataChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Data Value',
+                        data: [],
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Value'
+                            },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        };
+        
+        const updateChart = (newDataPoint) => {
+            chart.data.labels.push(newDataPoint.timestamp);
+            chart.data.datasets[0].data.push(newDataPoint.value);
+
+            // Keep only the last 20 data points for better readability and performance
+            if (chart.data.labels.length > 20) {
+                chart.data.labels.shift();
+                chart.data.datasets[0].data.shift();
+            }
+
+            chart.update();
+        };
+
+        const analyzeData = async () => {
+            if (data.length === 0) {
+                insightDisplay.innerHTML = 'No data to analyze yet. Start fetching some data first!';
+                return;
+            }
+
+            insightDisplay.innerHTML = '<div class="loading-spinner"></div> Analyzing data...';
+            analyzeBtn.disabled = true;
+
+            const values = data.map(d => d.value.toFixed(2));
+            const prompt = `Given the following data points (values only): ${values.join(', ')}. Provide a brief analysis of the trend observed in this data. Focus on whether it's generally increasing, decreasing, stable, or fluctuating, and any other noticeable patterns. Keep the response concise, under 50 words.`;
+
+            let chatHistory = [];
+            chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+            const payload = { contents: chatHistory };
+            const apiKey = "YOUR_API_KEY"; // API key added here
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    insightDisplay.innerHTML = `<p class="text-base font-medium">${text}</p>`;
+                } else {
+                    insightDisplay.innerHTML = '<p class="text-red-500">Error: Could not get analysis from AI. Unexpected response structure.</p>';
+                }
+            } catch (error) {
+                console.error('Error fetching from Gemini API:', error);
+                insightDisplay.innerHTML = `<p class="text-red-500">Error: Failed to connect to AI. Please try again.</p>`;
+            } finally {
+                analyzeBtn.disabled = false;
+            }
+        };
+
+        startBtn.addEventListener('click', startFetching);
+        stopBtn.addEventListener('click', stopFetching);
+        analyzeBtn.addEventListener('click', analyzeData);
+        
+        window.onload = () => {
+            createChart();
+        };
+    </script>
+</body>
+</html>
