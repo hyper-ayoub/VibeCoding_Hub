@@ -1,5 +1,9 @@
 # Project Requirements Document - Polling App with QR Code Sharing
 
+![image](https://github.com/user-attachments/assets/7b0ccb0d-f42b-4d5f-a05c-fb4fcc6bebd0)
+![image](https://github.com/user-attachments/assets/093be1f7-b8ac-4ec6-be6d-37e7d62a74a2)
+![image](https://github.com/user-attachments/assets/7d6dce30-e7e1-4f25-b557-f1010b4c8434)
+![image](https://github.com/user-attachments/assets/b7a560f4-5ff8-433a-a55b-7fd19eb6684d)
 ## Functional Requirements
 
 | Feature ID | Description | User Story | Expected Behavior/Outcome |
