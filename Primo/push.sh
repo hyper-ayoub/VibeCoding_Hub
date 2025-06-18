@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Number of commits to generate
-NUM_COMMITS=12
+NUM_COMMITS=22
 
 for ((i=0; i<$NUM_COMMITS; i++)); do
   # Random number of weeks and days ago
