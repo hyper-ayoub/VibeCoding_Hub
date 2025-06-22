@@ -1,7 +1,7 @@
 # Project Requirements Document - Polling App with QR Code Sharing
 
-![image](https://github.com/user-attachments/assets/7b0ccb0d-f42b-4d5f-a05c-fb4fcc6bebd0)
-![image](https://github.com/user-attachments/assets/093be1f7-b8ac-4ec6-be6d-37e7d62a74a2)
+![screencapture-preview-poll-pal-picks-lovable-app-2025-06-22-17_36_22](https://github.com/user-attachments/assets/5e60a9c5-d2fd-42c6-aa82-4a223cabf62e)
+
 ## Functional Requirements
 
 | Feature ID | Description | User Story | Expected Behavior/Outcome |
