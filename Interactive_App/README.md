@@ -2,7 +2,7 @@
 
 HyperBudget is a modern, responsive web application designed to help users find the perfect smartphone based on their budget and preferences. It features dynamic filtering, real-time price simulations, and a powerful AI recommendation engine powered by Google's Gemini API.
 
-![image](https://github.com/user-attachments/assets/492540fb-fdb4-4dd2-9ea1-e068b6143005)
+![image](https://github.com/user-attachments/assets/97e04919-c568-40d7-901e-a3f57069e6ba)
 
 ## ✨ Core Features
 
