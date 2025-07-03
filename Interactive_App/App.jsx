@@ -1,705 +1,642 @@
-import React, { useState, useEffect, createContext, useContext, useMemo } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import React, { useState, useEffect } from 'react';
+import { ArrowRight, ArrowLeft, Archive, Trash } from 'lucide-react';
+import ArchiveConfirmDialog from '../components/ArchiveConfirmDialog';
+import { getBrandImage } from '../utils/brandImages';
 
-// --- Firebase Context ---
-const FirebaseContext = createContext(null);
+const Index = () => {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [formData, setFormData] = useState({
+    budget: '',
+    useCase: '',
+    preferences: [],
+    additionalRequirements: ''
+  });
+  const [recommendations, setRecommendations] = useState([]);
+  const [archivedPhones, setArchivedPhones] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [archiveDialog, setArchiveDialog] = useState({ isOpen: false, phone: null });
 
-const FirebaseProvider = ({ children }) => {
-  const [db, setDb] = useState(null);
-  const [auth, setAuth] = useState(null);
-  const [userId, setUserId] = useState(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
+  const GEMINI_API_KEY = 'YOUR_API_KEY';
 
+  // Load archived phones from localStorage on component mount
   useEffect(() => {
-    // Initialize Firebase
-    try {
-      const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-      const app = initializeApp(firebaseConfig);
-      const firestoreDb = getFirestore(app);
-      const firebaseAuth = getAuth(app);
-
-      setDb(firestoreDb);
-      setAuth(firebaseAuth);
-
-      // Sign in and set up auth state listener
-      const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
-        if (user) {
-          setUserId(user.uid);
-        } else {
-          // If no user, try to sign in with custom token or anonymously
-          try {
-            if (typeof __initial_auth_token !== 'undefined') {
-              await signInWithCustomToken(firebaseAuth, __initial_auth_token);
-            } else {
-              await signInAnonymously(firebaseAuth);
-            }
-            // User will be set by the onAuthStateChanged listener after successful sign-in
-          } catch (error) {
-            console.error("Firebase authentication failed:", error);
-            // Fallback to a random ID if auth fails completely
-            setUserId(crypto.randomUUID());
-          }
-        }
-        setIsAuthReady(true); // Auth state is ready after initial check
-      });
-
-      return () => unsubscribe(); // Cleanup auth listener
-    } catch (error) {
-      console.error("Failed to initialize Firebase:", error);
-      // Fallback to random ID if Firebase initialization fails
-      setUserId(crypto.randomUUID());
-      setIsAuthReady(true);
+    const saved = localStorage.getItem('archivedPhones');
+    if (saved) {
+      try {
+        setArchivedPhones(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to parse archived phones:', e);
+      }
     }
   }, []);
 
-  const value = useMemo(() => ({ db, auth, userId, isAuthReady }), [db, auth, userId, isAuthReady]);
-
-  return (
-    <FirebaseContext.Provider value={value}>
-      {children}
-    </FirebaseContext.Provider>
-  );
-};
-
-const useFirebase = () => useContext(FirebaseContext);
-
-// --- Theme Context ---
-const ThemeContext = createContext(null);
-
-const ThemeProvider = ({ children }) => {
-  const { db, userId, isAuthReady } = useFirebase();
-  const [darkMode, setDarkMode] = useState(false); // Default to light mode
-  const [accentColor, setAccentColor] = useState('#6366f1'); // Default accent color (indigo-500)
-
-  // Load theme preferences from Firestore
+  // Save archived phones to localStorage whenever it changes
   useEffect(() => {
-    if (db && userId && isAuthReady) {
-      const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-      const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/preferences/theme`);
+    localStorage.setItem('archivedPhones', JSON.stringify(archivedPhones));
+  }, [archivedPhones]);
 
-      const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setDarkMode(data.darkMode || false);
-          setAccentColor(data.accentColor || '#6366f1');
-        } else {
-          // Set default theme if no preferences exist
-          setDarkMode(false);
-          setAccentColor('#6366f1');
-        }
-      }, (error) => {
-        console.error("Error fetching theme preferences:", error);
-      });
-
-      return () => unsubscribe();
-    }
-  }, [db, userId, isAuthReady]);
-
-  // Functions to toggle dark mode and change accent color (kept for programmatic use)
-  const toggleDarkMode = async () => {
-    if (db && userId) {
-      const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-      const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/preferences/theme`);
-      try {
-        await setDoc(userDocRef, { darkMode: !darkMode, accentColor }, { merge: true });
-      } catch (e) {
-        console.error("Error updating dark mode:", e);
-      }
-    } else {
-      setDarkMode(!darkMode);
-    }
-  };
-
-  const changeAccentColor = async (color) => {
-    if (db && userId) {
-      const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-      const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/preferences/theme`);
-      try {
-        await setDoc(userDocRef, { accentColor: color, darkMode }, { merge: true });
-      } catch (e) {
-        console.error("Error updating accent color:", e);
-      }
-    } else {
-      setAccentColor(color);
-    }
-  };
-
-  const themeClasses = darkMode ? 'dark bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900';
-
-  const value = useMemo(() => ({ darkMode, toggleDarkMode, accentColor, changeAccentColor, themeClasses }), [darkMode, accentColor, themeClasses]);
-
-  return (
-    <ThemeContext.Provider value={value}>
-      {children}
-    </ThemeContext.Provider>
-  );
-};
-
-const useTheme = () => useContext(ThemeContext);
-
-// --- Mock Phone Data ---
-const mockPhones = [
-  {
-    id: '1',
-    name: 'Galaxy S24 Ultra',
-    brand: 'Samsung',
-    price: 1199,
-    performanceScore: 9.8,
-    batteryLifeHours: 28,
-    cameraQualityMP: 200,
-    image: 'https://placehold.co/150x150/E0E7FF/3730A3?text=S24U',
-    description: 'Top-tier Android flagship with an incredible camera and powerful performance, ideal for photography and business.',
-    tags: ['photography', 'business', 'high-performance'],
-  },
-  {
-    id: '2',
-    name: 'iPhone 15 Pro Max',
-    brand: 'Apple',
-    price: 1299,
-    performanceScore: 9.9,
-    batteryLifeHours: 30,
-    cameraQualityMP: 48,
-    image: 'https://placehold.co/150x150/FEE2E2/991B1B?text=iP15PM',
-    description: 'The ultimate iPhone experience with exceptional performance and battery life, great for gaming and general use.',
-    tags: ['gaming', 'high-performance', 'photography'],
-  },
-  {
-    id: '3',
-    name: 'Google Pixel 8 Pro',
-    brand: 'Google',
-    price: 899,
-    performanceScore: 9.0,
-    batteryLifeHours: 24,
-    cameraQualityMP: 50,
-    image: 'https://placehold.co/150x150/DBEAFE/1E40AF?text=P8P',
-    description: 'Excellent camera and AI features, offering a pure Android experience. Good for everyday use and photography.',
-    tags: ['photography', 'everyday'],
-  },
-  {
-    id: '4',
-    name: 'OnePlus 12',
-    brand: 'OnePlus',
-    price: 799,
-    performanceScore: 9.5,
-    batteryLifeHours: 26,
-    cameraQualityMP: 50,
-    image: 'https://placehold.co/150x150/D1FAE5/065F46?text=OP12',
-    description: 'Fast charging and smooth performance, a great all-rounder for gaming and daily tasks.',
-    tags: ['gaming', 'everyday', 'high-performance'],
-  },
-  {
-    id: '5',
-    name: 'Xiaomi 14 Ultra',
-    brand: 'Xiaomi',
-    price: 999,
-    performanceScore: 9.7,
-    batteryLifeHours: 27,
-    cameraQualityMP: 50,
-    image: 'https://placehold.co/150x150/FFFBEB/92400E?text=X14U',
-    description: 'Powerful camera system and high-end specs, appealing to photography enthusiasts and power users.',
-    tags: ['photography', 'high-performance'],
-  },
-  {
-    id: '6',
-    name: 'Samsung Galaxy A55',
-    brand: 'Samsung',
-    price: 499,
-    performanceScore: 7.5,
-    batteryLifeHours: 20,
-    cameraQualityMP: 50,
-    image: 'https://placehold.co/150x150/E0E7FF/3730A3?text=A55',
-    description: 'Mid-range option with a good display and reliable battery life, suitable for general use.',
-    tags: ['everyday'],
-  },
-  {
-    id: '7',
-    name: 'iPhone SE (2022)',
-    brand: 'Apple',
-    price: 429,
-    performanceScore: 8.0,
-    batteryLifeHours: 15,
-    cameraQualityMP: 12,
-    image: 'https://placehold.co/150x150/FEE2E2/991B1B?text=iPSE',
-    description: 'Compact and powerful, an affordable entry into the Apple ecosystem.',
-    tags: ['everyday'],
-  },
-  {
-    id: '8',
-    name: 'Redmi Note 13 Pro+',
-    brand: 'Xiaomi',
-    price: 399,
-    performanceScore: 7.0,
-    batteryLifeHours: 22,
-    cameraQualityMP: 200,
-    image: 'https://placehold.co/150x150/FFFBEB/92400E?text=RN13P',
-    description: 'Budget-friendly phone with a high-resolution camera, great for casual photography.',
-    tags: ['photography', 'budget'],
-  },
-  {
-    id: '9',
-    name: 'ASUS ROG Phone 8 Pro',
-    brand: 'ASUS',
-    price: 1099,
-    performanceScore: 9.9,
-    batteryLifeHours: 29,
-    cameraQualityMP: 50,
-    image: 'https://placehold.co/150x150/F0F9FF/0C4A6E?text=ROG8P',
-    description: 'Designed specifically for gaming, with top-tier performance and cooling.',
-    tags: ['gaming', 'high-performance'],
-  },
-  {
-    id: '10',
-    name: 'Sony Xperia 1 V',
-    brand: 'Sony',
-    price: 1099,
-    performanceScore: 9.2,
-    batteryLifeHours: 25,
-    cameraQualityMP: 48,
-    image: 'https://placehold.co/150x150/F0FDF4/14532D?text=Xperia1V',
-    description: 'A multimedia powerhouse with a focus on camera and display quality, good for content creators.',
-    tags: ['photography', 'business'],
-  },
-];
-
-// --- Components ---
-
-const Header = () => {
-  const { darkMode, accentColor } = useTheme(); // Removed toggleDarkMode and changeAccentColor as they are not used in UI
-  const { userId } = useFirebase();
-
-  return (
-    <header className="p-4 shadow-md transition-colors duration-300" style={{ backgroundColor: darkMode ? '#1f2937' : '#ffffff' }}>
-      <div className="container mx-auto flex flex-col sm:flex-row items-center justify-between">
-        <h1 className="text-3xl font-extrabold mb-4 sm:mb-0" style={{ color: accentColor }}>HyperBudget</h1> {/* Changed app name here */}
-        <div className="flex items-center space-x-4">
-          {userId && (
-            <span className="text-sm px-2 py-1 rounded-full" style={{ backgroundColor: accentColor, color: 'white' }}>
-              User ID: {userId.substring(0, 8)}...
-            </span>
-          )}
-          {/* Removed the entire Themes button and dropdown */}
-        </div>
-      </div>
-    </header>
-  );
-};
-
-const FilterSection = ({ filters, setFilters, onBudgetChange, budget, aiRecommendations, aiLoading, aiError, aiSuggestedPhone }) => {
-  const { accentColor, darkMode } = useTheme();
-  const [localBudget, setLocalBudget] = useState(budget); // Local state for budget input
-
-  useEffect(() => {
-    setLocalBudget(budget); // Sync local budget with prop
-  }, [budget]);
-
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleBudgetInputChange = (e) => {
-    setLocalBudget(e.target.value);
-  };
-
-  const handleBudgetSubmit = () => {
-    onBudgetChange(Number(localBudget));
-  };
-
-  const handlePreferenceChange = (e) => {
-    const { value, checked } = e.target;
-    setFilters(prev => ({
-      ...prev,
-      preferences: checked
-        ? [...prev.preferences, value]
-        : prev.preferences.filter(pref => pref !== value)
-    }));
-  };
-
-  // New AI recommendation options
-  const aiPreferenceOptions = [
-    'gaming',
-    'photography',
-    'business',
-    'everyday use',
-    'long battery life',
-    'best camera',
-    'budget-friendly'
+  const steps = [
+    { title: 'Budget', subtitle: 'What\'s your budget range?' },
+    { title: 'Use Case', subtitle: 'How will you use your phone?' },
+    { title: 'Preferences', subtitle: 'What features matter most?' },
+    { title: 'Additional', subtitle: 'Any other requirements?' }
   ];
 
-  return (
-    <aside className={`p-6 rounded-lg shadow-lg space-y-6 transition-colors duration-300 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-      <h2 className="text-2xl font-bold mb-4" style={{ color: accentColor }}>Filters & Preferences</h2>
+  const useCases = [
+    { id: 'gaming', label: '🎮 Gaming', desc: 'High performance for mobile games' },
+    { id: 'photography', label: '📸 Photography', desc: 'Excellent camera system' },
+    { id: 'business', label: '💼 Business', desc: 'Professional use and productivity' },
+    { id: 'everyday', label: '📱 Everyday', desc: 'General daily usage' },
+    { id: 'content', label: '🎥 Content Creation', desc: 'Video and content creation' },
+    { id: 'travel', label: '✈️ Travel', desc: 'Long battery and durability' }
+  ];
 
-      {/* Budget Input (serves as max price) */}
-      <div>
-        <label htmlFor="budget" className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Your Max Budget ($)</label>
-        <div className="flex">
-          <input
-            type="number"
-            id="budget"
-            name="budget"
-            value={localBudget}
-            onChange={handleBudgetInputChange}
-            placeholder="e.g., 800"
-            className={`flex-grow p-3 border rounded-l-lg focus:outline-none focus:ring-2 ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'}`}
-            min="0"
-          />
-          <button
-            onClick={handleBudgetSubmit}
-            className={`px-4 py-3 rounded-r-lg font-semibold transition-all duration-300 hover:opacity-90`}
-            style={{ backgroundColor: accentColor, color: 'white' }}
-          >
-            Set
-          </button>
-        </div>
-      </div>
+  const preferenceOptions = [
+    { id: 'battery', label: '🔋 Long Battery Life', desc: 'All-day usage' },
+    { id: 'camera', label: '📷 Camera Quality', desc: 'Top-tier photography' },
+    { id: 'performance', label: '⚡ High Performance', desc: 'Fast and smooth' },
+    { id: 'display', label: '📺 Great Display', desc: 'Vivid colors and clarity' },
+    { id: 'storage', label: '💾 Large Storage', desc: 'Plenty of space' },
+    { id: 'brand', label: '🏆 Premium Brand', desc: 'Trusted manufacturers' },
+    { id: 'design', label: '✨ Sleek Design', desc: 'Beautiful aesthetics' },
+    { id: 'durability', label: '🛡️ Durability', desc: 'Resistant to damage' }
+  ];
 
-      {/* Brand Filter */}
-      <div>
-        <label htmlFor="brand" className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Brand</label>
-        <select
-          id="brand"
-          name="brand"
-          value={filters.brand}
-          onChange={handleFilterChange}
-          className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'}`}
-        >
-          <option value="">All Brands</option>
-          <option value="Samsung">Samsung</option>
-          <option value="Apple">Apple</option>
-          <option value="Google">Google</option>
-          <option value="OnePlus">OnePlus</option>
-          <option value="Xiaomi">Xiaomi</option>
-          <option value="ASUS">ASUS</option>
-          <option value="Sony">Sony</option>
-        </select>
-      </div>
-
-      {/* Removed Performance Filter */}
-      {/* <div>
-        <label htmlFor="performance" className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Performance (Score)</label>
-        <input
-          type="range"
-          id="performance"
-          name="performance"
-          min="0"
-          max="10"
-          step="0.1"
-          value={filters.performance}
-          onChange={handleFilterChange}
-          className="w-full h-2 rounded-lg appearance-none cursor-pointer"
-          style={{ background: `linear-gradient(to right, ${accentColor} 0%, ${accentColor} ${filters.performance * 10}%, ${darkMode ? '#4b5563' : '#d1d5db'} ${filters.performance * 10}%, ${darkMode ? '#4b5563' : '#d1d5db'} 100%)` }}
-        />
-        <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{filters.performance} / 10</span>
-      </div> */}
-
-      {/* Battery Life Filter */}
-      <div>
-        <label htmlFor="battery" className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Battery Life (Hours)</label>
-        <input
-          type="range"
-          id="battery"
-          name="battery"
-          min="0"
-          max="30"
-          step="1"
-          value={filters.battery}
-          onChange={handleFilterChange}
-          className="w-full h-2 rounded-lg appearance-none cursor-pointer"
-          style={{ background: `linear-gradient(to right, ${accentColor} 0%, ${accentColor} ${filters.battery / 0.3}%, ${darkMode ? '#4b5563' : '#d1d5db'} ${filters.battery / 0.3}%, ${darkMode ? '#4b5563' : '#d1d5db'} 100%)` }}
-        />
-        <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{filters.battery}+ hours</span>
-      </div>
-
-      {/* Camera Quality Filter */}
-      <div>
-        <label htmlFor="camera" className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Camera Quality (MP)</label>
-        <input
-          type="range"
-          id="camera"
-          name="camera"
-          min="0"
-          max="200"
-          step="10"
-          value={filters.camera}
-          onChange={handleFilterChange}
-          className="w-full h-2 rounded-lg appearance-none cursor-pointer"
-          style={{ background: `linear-gradient(to right, ${accentColor} 0%, ${accentColor} ${filters.camera / 2}%, ${darkMode ? '#4b5563' : '#d1d5db'} ${filters.camera / 2}%, ${darkMode ? '#4b5563' : '#d1d5db'} 100%)` }}
-        />
-        <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{filters.camera}+ MP</span>
-      </div>
-
-      {/* AI Preferences */}
-      <div>
-        <h3 className={`text-lg font-semibold mb-3 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>AI Recommendations (Preferences)</h3>
-        <div className="flex flex-wrap gap-3">
-          {aiPreferenceOptions.map(pref => (
-            <label key={pref} className={`inline-flex items-center cursor-pointer px-4 py-2 rounded-full transition-all duration-300 ${filters.preferences.includes(pref) ? 'text-white' : (darkMode ? 'text-gray-300 border border-gray-600' : 'text-gray-700 border border-gray-300')}`}
-              style={{ backgroundColor: filters.preferences.includes(pref) ? accentColor : (darkMode ? '#374151' : '#f3f4f6') }}
-            >
-              <input
-                type="checkbox"
-                value={pref}
-                checked={filters.preferences.includes(pref)}
-                onChange={handlePreferenceChange}
-                className="form-checkbox h-4 w-4 hidden"
-              />
-              <span className="ml-2 capitalize">{pref}</span>
-            </label>
-          ))}
-        </div>
-        <button
-          onClick={aiRecommendations}
-          disabled={aiLoading}
-          className={`mt-4 w-full py-3 rounded-lg font-semibold transition-all duration-300 hover:opacity-90 ${aiLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-          style={{ backgroundColor: accentColor, color: 'white' }}
-        >
-          {aiLoading ? 'Thinking...' : 'Get AI Recommendation'}
-        </button>
-        {aiError && <p className="text-red-500 text-sm mt-2">{aiError}</p>}
-      </div>
-      {aiSuggestedPhone && (
-        <div className={`mt-6 p-4 rounded-lg shadow-inner ${darkMode ? 'bg-gray-700' : 'bg-blue-50'}`}>
-          <h3 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-gray-200' : 'text-blue-800'}`}>AI's Top Pick:</h3>
-          <p className={`${darkMode ? 'text-gray-300' : 'text-blue-700'}`}>{aiSuggestedPhone.name} ({aiSuggestedPhone.brand}) - ${aiSuggestedPhone.price}</p>
-          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-blue-600'}`}>{aiSuggestedPhone.description}</p>
-        </div>
-      )}
-    </aside>
-  );
-};
-
-const PhoneCard = ({ phone, accentColor, darkMode }) => {
-  // Simulate real-time price update
-  const [displayPrice, setDisplayPrice] = useState(phone.price);
-  const [lastUpdated, setLastUpdated] = useState(new Date());
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const priceVariation = (Math.random() - 0.5) * 20; // +/- $10
-      setDisplayPrice(Math.max(1, Math.round(phone.price + priceVariation)));
-      setLastUpdated(new Date());
-    }, 5000); // Update every 5 seconds
-
-    return () => clearInterval(interval);
-  }, [phone.price]);
-
-  const timeAgo = (date) => {
-    const seconds = Math.floor((new Date() - date) / 1000);
-    if (seconds < 60) return `${seconds}s ago`;
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    return date.toLocaleDateString();
+  const handleBudgetChange = (e) => {
+    setFormData({ ...formData, budget: e.target.value });
   };
 
-  return (
-    <div className={`relative rounded-lg shadow-md overflow-hidden transform transition-all duration-300 hover:scale-105 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-      <img src={phone.image} alt={phone.name} className="w-full h-48 object-cover" />
-      <div className="p-4">
-        <h3 className="text-xl font-bold mb-2" style={{ color: accentColor }}>{phone.name}</h3>
-        <p className={`text-sm mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Brand: {phone.brand}</p>
-        {/* Removed Performance Score display */}
-        {/* <p className={`text-sm mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Performance: {phone.performanceScore}/10</p> */}
-        <p className={`text-sm mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Battery: {phone.batteryLifeHours} hrs</p>
-        <p className={`text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Camera: {phone.cameraQualityMP} MP</p>
-        <p className={`text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{phone.description}</p>
-        <div className="flex items-center justify-between mt-4">
-          <span className="text-2xl font-extrabold" style={{ color: accentColor }}>${displayPrice}</span>
-          <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Updated: {timeAgo(lastUpdated)}</span>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const MessageBox = ({ message, type, onClose }) => {
-  const { accentColor, darkMode } = useTheme();
-  let bgColor = '';
-  let textColor = '';
-
-  switch (type) {
-    case 'success':
-      bgColor = 'bg-green-100';
-      textColor = 'text-green-800';
-      break;
-    case 'error':
-      bgColor = 'bg-red-100';
-      textColor = 'text-red-800';
-      break;
-    case 'info':
-    default:
-      bgColor = 'bg-blue-100';
-      textColor = 'text-blue-800';
-      break;
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className={`rounded-lg shadow-xl p-6 max-w-sm w-full ${darkMode ? 'bg-gray-700' : 'bg-white'}`}>
-        <div className={`p-3 rounded-md ${bgColor} ${textColor} mb-4`}>
-          <p className="font-semibold">{message}</p>
-        </div>
-        <button
-          onClick={onClose}
-          className={`w-full py-2 rounded-lg font-semibold transition-all duration-300 hover:opacity-90`}
-          style={{ backgroundColor: accentColor, color: 'white' }}
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  );
-};
-
-
-// --- Core App Content Component ---
-// This component will be wrapped by the providers
-function AppContent() {
-  const { themeClasses, accentColor, darkMode } = useTheme();
-  const [budget, setBudget] = useState(1000);
-  const [filters, setFilters] = useState({
-    brand: '',
-    // Removed performance from filters state
-    battery: 0,
-    camera: 0,
-    preferences: [], // For AI recommendations
-  });
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState(null);
-  const [messageBox, setMessageBox] = useState(null); // { message: '', type: '' }
-  const [aiSuggestedPhone, setAiSuggestedPhone] = useState(null); // New state for AI suggested phone
-
-  const handleBudgetChange = (newBudget) => {
-    setBudget(newBudget);
+  const handleUseCaseSelect = (useCase) => {
+    setFormData({ ...formData, useCase });
   };
 
-  const getAIRecommendation = async () => {
-    setAiLoading(true);
-    setAiError(null);
-    setMessageBox(null);
-    setAiSuggestedPhone(null); // Clear previous AI suggestion
+  const handlePreferenceToggle = (preference) => {
+    const newPreferences = formData.preferences.includes(preference)
+      ? formData.preferences.filter(p => p !== preference)
+      : [...formData.preferences, preference];
+    setFormData({ ...formData, preferences: newPreferences });
+  };
 
-    const preferenceText = filters.preferences.length > 0
-      ? `user preferences for ${filters.preferences.join(', ')}`
-      : 'general use';
-
-    // Get all phones, regardless of current brand filter, to allow AI to suggest different brands
-    const allPhonesForAI = mockPhones;
-    const phoneNames = allPhonesForAI.map(p => p.name).join(', ');
-
-    // Adjusted prompt to encourage different brands if a brand filter is active,
-    // and to be more direct about the recommendation.
-    let prompt = `Given a budget of $${budget} and ${preferenceText}, suggest a suitable phone from the following list. Focus on the best fit for the preferences.`;
-    if (filters.brand) {
-      prompt += ` The user is currently filtering by ${filters.brand}. If a better option from another brand exists within the budget and preferences, suggest it. Otherwise, suggest the best ${filters.brand} phone.`;
+  const nextStep = () => {
+    if (currentStep < steps.length - 1) {
+      setCurrentStep(currentStep + 1);
     }
-    prompt += ` Only provide the name of the phone. If no phone perfectly matches, suggest the closest one. Phone list: ${phoneNames}.`;
+  };
+
+  const prevStep = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const canProceed = () => {
+    switch (currentStep) {
+      case 0: return formData.budget !== '';
+      case 1: return formData.useCase !== '';
+      case 2: return formData.preferences.length > 0;
+      case 3: return true;
+      default: return false;
+    }
+  };
+
+  const openArchiveDialog = (phone) => {
+    setArchiveDialog({ isOpen: true, phone });
+  };
+
+  const closeArchiveDialog = () => {
+    setArchiveDialog({ isOpen: false, phone: null });
+  };
+
+  const confirmArchive = () => {
+    if (archiveDialog.phone) {
+      const phoneWithId = { ...archiveDialog.phone, id: Date.now() + Math.random() };
+      setArchivedPhones(prev => [...prev, phoneWithId]);
+    }
+    closeArchiveDialog();
+  };
+
+  const removeFromArchive = (phoneId) => {
+    setArchivedPhones(prev => prev.filter(phone => phone.id !== phoneId));
+  };
+
+  const isPhoneArchived = (phone) => {
+    return archivedPhones.some(archived => archived.name === phone.name && archived.brand === phone.brand);
+  };
+
+  const getRecommendations = async () => {
+    setLoading(true);
+    setError('');
+
+    const prompt = `You are a phone recommendation expert. Based on the following user requirements, recommend 3-4 specific phone models with detailed explanations:
+
+Budget: $${formData.budget}
+Primary Use Case: ${formData.useCase}
+Key Preferences: ${formData.preferences.join(', ')}
+Additional Requirements: ${formData.additionalRequirements || 'None'}
+
+For each phone recommendation, provide:
+1. Exact model name and brand
+2. Current approximate price
+3. Key specifications (processor, RAM, storage, camera, battery)
+4. Why it fits their needs
+5. Pros and cons
+6. Overall rating out of 10
+
+Format your response as a JSON array with objects containing: name, brand, price, specs, whyRecommended, pros, cons, rating
+
+Ensure all recommendations are within budget and available in 2024/2025.`;
 
     try {
-      let chatHistory = [];
-      chatHistory.push({ role: "user", parts: [{ text: prompt }] });
-      const payload = { contents: chatHistory };
-      const apiKey = "";
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-
-      const response = await fetch(apiUrl, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: prompt
+            }]
+          }]
+        })
       });
 
       const result = await response.json();
-
-      if (result.candidates && result.candidates.length > 0 &&
-        result.candidates[0].content && result.candidates[0].content.parts &&
-        result.candidates[0].content.parts.length > 0) {
-        const aiSuggestedPhoneName = result.candidates[0].content.parts[0].text.trim();
-        const suggestedPhone = mockPhones.find(p => aiSuggestedPhoneName.includes(p.name));
-
-        if (suggestedPhone) {
-          setAiSuggestedPhone(suggestedPhone); // Store the suggested phone
-          setMessageBox({ message: `AI recommends: ${suggestedPhone.name}!`, type: 'success' });
-          // Do NOT automatically change filters here. Display the suggestion separately.
+      
+      if (result.candidates && result.candidates[0]?.content?.parts?.[0]?.text) {
+        const responseText = result.candidates[0].content.parts[0].text;
+        
+        // Try to extract JSON from the response
+        const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          const parsedRecommendations = JSON.parse(jsonMatch[0]);
+          setRecommendations(parsedRecommendations);
         } else {
-          setMessageBox({ message: `AI suggested "${aiSuggestedPhoneName}", but it's not in our list. Please try adjusting your preferences.`, type: 'info' });
+          // If no JSON found, parse the text response manually
+          const textRecommendations = parseTextRecommendations(responseText);
+          setRecommendations(textRecommendations);
         }
       } else {
-        setMessageBox({ message: "AI couldn't generate a recommendation. Please try again.", type: 'error' });
+        throw new Error('No recommendations received');
       }
-    } catch (error) {
-      console.error("Error fetching AI recommendation:", error);
-      setAiError("Failed to get AI recommendation. Please try again.");
-      setMessageBox({ message: "Failed to get AI recommendation. Please check your network.", type: 'error' });
+    } catch (err) {
+      console.error('Error getting recommendations:', err);
+      setError('Failed to get recommendations. Please try again.');
     } finally {
-      setAiLoading(false);
+      setLoading(false);
     }
   };
 
-  const filteredPhones = useMemo(() => {
-    return mockPhones.filter(phone => {
-      const matchesBudget = phone.price <= budget; // Budget now acts as max price
-      const matchesBrand = filters.brand === '' || phone.brand === filters.brand;
-      // Removed matchesPerformance from filtering logic
-      const matchesBattery = phone.batteryLifeHours >= filters.battery;
-      const matchesCamera = filters.camera === 0 || phone.cameraQualityMP >= filters.camera; // Ensure camera filter works correctly
+  const parseTextRecommendations = (text) => {
+    // Fallback parser for non-JSON responses
+    const lines = text.split('\n').filter(line => line.trim());
+    const recommendations = [];
+    let currentRec = null;
 
-      return matchesBudget && matchesBrand && matchesBattery && matchesCamera;
+    lines.forEach(line => {
+      if (line.match(/^\d+\./)) {
+        if (currentRec) recommendations.push(currentRec);
+        currentRec = {
+          name: line.replace(/^\d+\.\s*/, ''),
+          brand: 'Various',
+          price: 'TBD',
+          specs: {},
+          whyRecommended: '',
+          pros: [],
+          cons: [],
+          rating: 8
+        };
+      } else if (currentRec && line.includes('Price:')) {
+        currentRec.price = line.replace(/.*Price:\s*/, '');
+      } else if (currentRec && line.includes('Why:')) {
+        currentRec.whyRecommended = line.replace(/.*Why:\s*/, '');
+      }
     });
-  }, [budget, filters]);
 
-  return (
-    <div className={`min-h-screen font-sans antialiased ${themeClasses}`}>
-      <Header />
-      <main className="container mx-auto p-6 grid grid-cols-1 lg:grid-cols-4 gap-8">
-        <div className="lg:col-span-1">
-          <FilterSection
-            filters={filters}
-            setFilters={setFilters}
-            onBudgetChange={handleBudgetChange}
-            budget={budget}
-            aiRecommendations={getAIRecommendation}
-            aiLoading={aiLoading}
-            aiError={aiError}
-            aiSuggestedPhone={aiSuggestedPhone} // Pass the AI suggested phone to FilterSection
-          />
-        </div>
-        <section className="lg:col-span-3">
-          <h2 className="text-3xl font-bold mb-6" style={{ color: accentColor }}>Recommended Phones</h2>
-          {filteredPhones.length === 0 ? (
-            <p className={`text-lg ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>No phones match your criteria. Try adjusting your filters or budget.</p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {filteredPhones.map(phone => (
-                <PhoneCard key={phone.id} phone={phone} accentColor={accentColor} darkMode={darkMode} />
+    if (currentRec) recommendations.push(currentRec);
+    return recommendations;
+  };
+
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 0:
+        return (
+          <div className="space-y-6">
+            <div className="text-center">
+              <h3 className="text-2xl font-bold text-white mb-2">What's your budget?</h3>
+              <p className="text-cyan-200">Enter your maximum budget in USD</p>
+            </div>
+            <div className="max-w-md mx-auto">
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-cyan-300 text-xl">$</span>
+                <input
+                  type="number"
+                  value={formData.budget}
+                  onChange={handleBudgetChange}
+                  placeholder="1000"
+                  className="w-full pl-8 pr-4 py-4 text-xl border-2 border-cyan-400/30 bg-black/20 backdrop-blur-sm rounded-xl focus:border-cyan-400 focus:outline-none transition-all text-white placeholder-cyan-300/50"
+                />
+              </div>
+              <div className="flex justify-between mt-4 text-sm text-cyan-200">
+                <span>Budget phones: $200-400</span>
+                <span>Flagship: $800-1200+</span>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 1:
+        return (
+          <div className="space-y-6">
+            <div className="text-center">
+              <h3 className="text-2xl font-bold text-white mb-2">How will you use your phone?</h3>
+              <p className="text-cyan-200">Select your primary use case</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+              {useCases.map((useCase) => (
+                <button
+                  key={useCase.id}
+                  onClick={() => handleUseCaseSelect(useCase.id)}
+                  className={`p-6 rounded-xl border-2 transition-all text-left hover:shadow-lg hover:shadow-cyan-500/20 hover:scale-105 transform duration-300 bg-black/20 backdrop-blur-sm ${
+                    formData.useCase === useCase.id
+                      ? 'border-cyan-400 bg-cyan-500/20 shadow-cyan-500/30'
+                      : 'border-cyan-400/30 hover:border-cyan-400/60'
+                  }`}
+                >
+                  <div className="text-2xl mb-2">{useCase.label.split(' ')[0]}</div>
+                  <div className="font-semibold text-white">{useCase.label.substring(2)}</div>
+                  <div className="text-sm text-cyan-200 mt-1">{useCase.desc}</div>
+                </button>
               ))}
             </div>
+          </div>
+        );
+
+      case 2:
+        return (
+          <div className="space-y-6">
+            <div className="text-center">
+              <h3 className="text-2xl font-bold text-white mb-2">What features matter most?</h3>
+              <p className="text-cyan-200">Select all that apply</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-3xl mx-auto">
+              {preferenceOptions.map((pref) => (
+                <button
+                  key={pref.id}
+                  onClick={() => handlePreferenceToggle(pref.id)}
+                  className={`p-4 rounded-xl border-2 transition-all text-left hover:shadow-md hover:shadow-cyan-500/20 hover:scale-105 transform duration-300 bg-black/20 backdrop-blur-sm ${
+                    formData.preferences.includes(pref.id)
+                      ? 'border-cyan-400 bg-cyan-500/20 shadow-cyan-500/30'
+                      : 'border-cyan-400/30 hover:border-cyan-400/60'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold text-white">{pref.label}</div>
+                      <div className="text-sm text-cyan-200">{pref.desc}</div>
+                    </div>
+                    {formData.preferences.includes(pref.id) && (
+                      <div className="w-6 h-6 bg-cyan-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-sm">✓</span>
+                      </div>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 3:
+        return (
+          <div className="space-y-6">
+            <div className="text-center">
+              <h3 className="text-2xl font-bold text-white mb-2">Any additional requirements?</h3>
+              <p className="text-cyan-200">Specific brands, features, or dealbreakers (optional)</p>
+            </div>
+            <div className="max-w-lg mx-auto">
+              <textarea
+                value={formData.additionalRequirements}
+                onChange={(e) => setFormData({ ...formData, additionalRequirements: e.target.value })}
+                placeholder="e.g., Must have wireless charging, prefer Samsung, no older than 2023..."
+                className="w-full px-4 py-4 border-2 border-cyan-400/30 bg-black/20 backdrop-blur-sm rounded-xl focus:border-cyan-400 focus:outline-none transition-all resize-none text-white placeholder-cyan-300/50"
+                rows={4}
+              />
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  if (recommendations.length > 0) {
+    return (
+      <div className="min-h-screen bg-cover bg-center bg-fixed relative" style={{ backgroundImage: `url('/lovable-uploads/c6b815f1-90da-4241-a0c6-6c875be399f7.png')` }}>
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"></div>
+        <div className="relative z-10 container mx-auto px-4 max-w-7xl py-8">
+          <div className="text-center mb-8">
+            <h1 className="text-5xl font-bold text-white mb-2 drop-shadow-lg">Your Perfect Phone Matches</h1>
+            <p className="text-cyan-200 text-lg drop-shadow">Based on your preferences, here are our AI-powered recommendations</p>
+            <button
+              onClick={() => {
+                setRecommendations([]);
+                setCurrentStep(0);
+                setFormData({ budget: '', useCase: '', preferences: [], additionalRequirements: '' });
+              }}
+              className="mt-4 px-6 py-2 bg-black/30 backdrop-blur-sm text-cyan-200 rounded-lg hover:bg-black/50 transition-all border border-cyan-400/30 hover:border-cyan-400/60"
+            >
+              Start Over
+            </button>
+          </div>
+
+          {/* Archived Phones Section */}
+          {archivedPhones.length > 0 && (
+            <div className="mb-12">
+              <h2 className="text-3xl font-bold text-white mb-6 text-center drop-shadow-lg">📥 Your Saved Favorites</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {archivedPhones.map((phone) => (
+                  <div key={phone.id} className="bg-gradient-to-br from-purple-900/80 to-indigo-900/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl hover:shadow-purple-500/30 transition-all duration-500 hover:scale-105 transform border border-purple-400/30">
+                    <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-6 text-white relative">
+                      <div className="absolute top-2 right-2 bg-purple-500/30 px-2 py-1 rounded-full text-xs font-semibold">
+                        SAVED
+                      </div>
+                      <div className="flex items-center mb-4">
+                        <img 
+                          src={getBrandImage(phone.brand)} 
+                          alt={phone.brand}
+                          className="w-12 h-12 rounded-lg object-cover mr-3 border-2 border-white/20"
+                        />
+                        <div>
+                          <h3 className="text-xl font-bold mb-1">{phone.name}</h3>
+                          <p className="text-purple-100">{phone.brand}</p>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-2xl font-bold">{phone.price}</span>
+                        <span className="bg-white bg-opacity-20 px-3 py-1 rounded-full text-sm flex items-center">
+                          {phone.rating}/10 ⭐
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-6">
+                      <div className="mb-4">
+                        <h4 className="font-semibold text-white mb-2">Why this phone?</h4>
+                        <p className="text-purple-200 text-sm">{phone.whyRecommended}</p>
+                      </div>
+
+                      {phone.specs && Object.keys(phone.specs).length > 0 && (
+                        <div className="mb-4">
+                          <h4 className="font-semibold text-white mb-2">Key Specs</h4>
+                          <div className="text-sm text-purple-200 space-y-1">
+                            {Object.entries(phone.specs).map(([key, value]) => (
+                              <div key={key} className="flex justify-between">
+                                <span className="capitalize">{key}:</span>
+                                <span>{String(value)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between items-center mt-4">
+                        <div className="grid grid-cols-2 gap-4 text-sm flex-1">
+                          <div>
+                            <h5 className="font-semibold text-green-400 mb-1">Pros</h5>
+                            <ul className="text-purple-200 space-y-1">
+                              {(phone.pros || []).slice(0, 2).map((pro, i) => (
+                                <li key={i} className="text-xs">• {pro}</li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div>
+                            <h5 className="font-semibold text-red-400 mb-1">Cons</h5>
+                            <ul className="text-purple-200 space-y-1">
+                              {(phone.cons || []).slice(0, 2).map((con, i) => (
+                                <li key={i} className="text-xs">• {con}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => removeFromArchive(phone.id)}
+                          className="ml-4 bg-red-500/20 hover:bg-red-500/40 text-red-300 px-3 py-2 rounded-lg transition-all duration-300 hover:scale-110 flex items-center text-sm border border-red-400/30"
+                        >
+                          <Trash className="w-4 h-4 mr-1" />
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
-        </section>
-      </main>
-      {messageBox && (
-        <MessageBox
-          message={messageBox.message}
-          type={messageBox.type}
-          onClose={() => setMessageBox(null)}
+
+          {/* New Recommendations Section */}
+          <div>
+            <h2 className="text-3xl font-bold text-white mb-6 text-center drop-shadow-lg">🔥 Fresh Recommendations</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {recommendations.map((phone, index) => (
+                <div key={index} className="bg-gradient-to-br from-cyan-900/80 to-blue-900/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl hover:shadow-cyan-500/30 transition-all duration-500 hover:scale-105 transform border border-cyan-400/30">
+                  <div className="bg-gradient-to-r from-cyan-500 to-blue-600 p-6 text-white">
+                    <div className="flex items-center mb-4">
+                      <img 
+                        src={getBrandImage(phone.brand)} 
+                        alt={phone.brand}
+                        className="w-12 h-12 rounded-lg object-cover mr-3 border-2 border-white/20"
+                      />
+                      <div>
+                        <h3 className="text-xl font-bold mb-1">{phone.name}</h3>
+                        <p className="text-cyan-100">{phone.brand}</p>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-2xl font-bold">{phone.price}</span>
+                      <span className="bg-white bg-opacity-20 px-3 py-1 rounded-full text-sm flex items-center">
+                        {phone.rating}/10 ⭐
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-6">
+                    <div className="mb-4">
+                      <h4 className="font-semibold text-white mb-2">Why this phone?</h4>
+                      <p className="text-cyan-200 text-sm">{phone.whyRecommended}</p>
+                    </div>
+
+                    {phone.specs && Object.keys(phone.specs).length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="font-semibold text-white mb-2">Key Specs</h4>
+                        <div className="text-sm text-cyan-200 space-y-1">
+                          {Object.entries(phone.specs).map(([key, value]) => (
+                            <div key={key} className="flex justify-between">
+                              <span className="capitalize">{key}:</span>
+                              <span>{String(value)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                      <div>
+                        <h5 className="font-semibold text-green-400 mb-1">Pros</h5>
+                        <ul className="text-cyan-200 space-y-1">
+                          {(phone.pros || []).slice(0, 3).map((pro, i) => (
+                            <li key={i} className="text-xs">• {pro}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-red-400 mb-1">Cons</h5>
+                        <ul className="text-cyan-200 space-y-1">
+                          {(phone.cons || []).slice(0, 3).map((con, i) => (
+                            <li key={i} className="text-xs">• {con}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={() => openArchiveDialog(phone)}
+                      disabled={isPhoneArchived(phone)}
+                      className={`w-full py-2 px-4 rounded-lg transition-all duration-300 hover:scale-105 flex items-center justify-center ${
+                        isPhoneArchived(phone)
+                          ? 'bg-gray-500/20 text-gray-400 cursor-not-allowed border border-gray-400/30'
+                          : 'bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 border border-cyan-400/30 hover:border-cyan-400/60'
+                      }`}
+                    >
+                      <Archive className="w-4 h-4 mr-2" />
+                      {isPhoneArchived(phone) ? 'Already Saved' : '📥 Save to Favorites'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Archive Confirmation Dialog */}
+        <ArchiveConfirmDialog
+          isOpen={archiveDialog.isOpen}
+          onClose={closeArchiveDialog}
+          onConfirm={confirmArchive}
+          phoneName={archiveDialog.phone?.name || ''}
         />
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-cover bg-center bg-fixed relative" style={{ backgroundImage: `url('/lovable-uploads/c6b815f1-90da-4241-a0c6-6c875be399f7.png')` }}>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]"></div>
+      <div className="relative z-10 min-h-screen flex items-center justify-center py-8">
+        <div className="container mx-auto px-4 max-w-4xl">
+          {/* Header */}
+          <div className="text-center mb-12">
+            <h1 className="text-6xl font-bold text-white mb-4 drop-shadow-2xl bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">HyperBudget</h1>
+            <p className="text-xl text-cyan-200 drop-shadow-lg">Find your perfect phone with AI-powered recommendations</p>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="mb-8">
+            <div className="flex justify-center mb-4">
+              <div className="flex items-center space-x-4">
+                {steps.map((step, index) => (
+                  <div key={index} className="flex items-center">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold transition-all duration-300 ${
+                      index <= currentStep 
+                        ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/30' 
+                        : 'bg-black/30 backdrop-blur-sm text-cyan-300 border border-cyan-400/30'
+                    }`}>
+                      {index + 1}
+                    </div>
+                    {index < steps.length - 1 && (
+                      <div className={`w-16 h-1 mx-2 rounded transition-all duration-300 ${
+                        index < currentStep ? 'bg-gradient-to-r from-cyan-500 to-blue-600' : 'bg-cyan-400/30'
+                      }`} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="text-center">
+              <h2 className="text-3xl font-semibold text-white drop-shadow-lg">{steps[currentStep].title}</h2>
+              <p className="text-cyan-200 drop-shadow">{steps[currentStep].subtitle}</p>
+            </div>
+          </div>
+
+          {/* Step Content */}
+          <div className="bg-black/30 backdrop-blur-sm rounded-2xl shadow-2xl p-8 mb-8 border border-cyan-400/20">
+            {renderStepContent()}
+          </div>
+
+          {/* Navigation */}
+          <div className="flex justify-between items-center">
+            <button
+              onClick={prevStep}
+              disabled={currentStep === 0}
+              className={`flex items-center px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
+                currentStep === 0
+                  ? 'bg-gray-500/20 text-gray-400 cursor-not-allowed border border-gray-400/30'
+                  : 'bg-black/30 backdrop-blur-sm text-cyan-200 hover:bg-black/50 border border-cyan-400/30 hover:border-cyan-400/60 hover:scale-105'
+              }`}
+            >
+              <ArrowLeft className="w-5 h-5 mr-2" />
+              Previous
+            </button>
+
+            {currentStep === steps.length - 1 ? (
+              <button
+                onClick={getRecommendations}
+                disabled={loading || !canProceed()}
+                className={`flex items-center px-8 py-3 rounded-lg font-semibold transition-all duration-300 ${
+                  loading || !canProceed()
+                    ? 'bg-gray-500/20 text-gray-400 cursor-not-allowed border border-gray-400/30'
+                    : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-700 shadow-lg shadow-cyan-500/30 hover:scale-105 hover:shadow-cyan-500/50'
+                }`}
+              >
+                {loading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                    Getting Recommendations...
+                  </>
+                ) : (
+                  <>
+                    Get Recommendations
+                    <ArrowRight className="w-5 h-5 ml-2" />
+                  </>
+                )}
+              </button>
+            ) : (
+              <button
+                onClick={nextStep}
+                disabled={!canProceed()}
+                className={`flex items-center px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
+                  !canProceed()
+                    ? 'bg-gray-500/20 text-gray-400 cursor-not-allowed border border-gray-400/30'
+                    : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-700 shadow-lg shadow-cyan-500/30 hover:scale-105 hover:shadow-cyan-500/50'
+                }`}
+              >
+                Next
+                <ArrowRight className="w-5 h-5 ml-2" />
+              </button>
+            )}
+          </div>
+
+          {error && (
+            <div className="mt-6 p-4 bg-red-900/80 backdrop-blur-sm border border-red-400/50 text-red-200 rounded-lg text-center">
+              {error}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
-}
+};
 
-// --- Main App Component that provides contexts ---
-function App() {
-  return (
-    <FirebaseProvider>
-      <ThemeProvider>
-        <AppContent />
-      </ThemeProvider>
-    </FirebaseProvider>
-  );
-}
-
-export default App;
+export default Index;
