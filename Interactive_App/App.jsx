@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowRight, ArrowLeft, Archive, Trash, X, CheckCircle, Info } from 'lucide-react'; // Added Info icon for toast
+import { ArrowRight, ArrowLeft, Archive, Trash, X, CheckCircle, Info } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore'; // Import getFirestore for Firebase setup (if needed for data persistence)
+import { getFirestore } from 'firebase/firestore';
 
 // --- Toast Notification Component ---
 const ToastNotification = ({ message, type, onClose }) => {
@@ -12,7 +12,7 @@ const ToastNotification = ({ message, type, onClose }) => {
     const timer = setTimeout(() => {
       setIsVisible(false);
       if (onClose) onClose();
-    }, 3000); // Auto-hide after 3 seconds
+    }, 3000);
 
     return () => clearTimeout(timer);
   }, [onClose]);
@@ -33,9 +33,9 @@ const ToastNotification = ({ message, type, onClose }) => {
   );
 };
 
-// Archive Confirmation Dialog Component (now inline for self-containment)
+// Archive Confirmation Dialog Component
 const ArchiveConfirmDialog = ({ isOpen, onClose, onConfirm, phoneName }) => {
-  if (!isOpen) return null; // Don't render if not open
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4 font-poppins">
@@ -69,6 +69,117 @@ const ArchiveConfirmDialog = ({ isOpen, onClose, onConfirm, phoneName }) => {
   );
 };
 
+// --- Phone Card Component ---
+const PhoneCard = ({ phone, isArchived, onArchive, onRemove }) => {
+  const cardBgGradient = isArchived ? 'from-purple-900/80 to-indigo-900/80' : 'from-blue-900/80 to-purple-900/80';
+  const headerBgGradient = isArchived ? 'from-purple-600 to-indigo-700' : 'from-blue-500 to-purple-600';
+  const borderColor = isArchived ? 'border-purple-400/40' : 'border-blue-400/40';
+  const shadowColor = isArchived ? 'shadow-purple-500/40' : 'shadow-blue-500/40';
+  const textColor = isArchived ? 'text-purple-200' : 'text-blue-200';
+  const brandTextColor = isArchived ? 'text-purple-100' : 'text-blue-100';
+
+  return (
+    <div className={`bg-gradient-to-br ${cardBgGradient} backdrop-blur-sm rounded-3xl shadow-2xl overflow-hidden hover:shadow-3xl hover:${shadowColor} transition-all duration-500 hover:scale-[1.02] transform border ${borderColor}`}>
+      <div className={`bg-gradient-to-r ${headerBgGradient} p-6 text-white relative`}>
+        {isArchived && (
+          <div className="absolute top-4 right-4 bg-purple-500/40 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide">
+            ARCHIVED
+          </div>
+        )}
+        <div className="flex items-center mb-4">
+          <img
+            src={phone.brandImageUrl || 'https://placehold.co/48x48/60A5FA/FFFFFF?text=PH'}
+            alt={phone.brand}
+            className="w-14 h-14 rounded-xl object-cover mr-4 border-2 border-white/30 shadow-md"
+            onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/48x48/60A5FA/FFFFFF?text=PH'; }}
+          />
+          <div>
+            <h3 className="text-2xl font-bold mb-1">{phone.name}</h3>
+            <p className={`${brandTextColor} text-lg`}>{phone.brand}</p>
+          </div>
+        </div>
+        <div className="flex justify-between items-center mt-3">
+          <span className="text-3xl font-bold">{phone.price}</span>
+          <span className="bg-white bg-opacity-20 px-4 py-1.5 rounded-full text-base flex items-center font-semibold">
+            {phone.rating?.toFixed(1)}/10 ⭐
+          </span>
+        </div>
+      </div>
+
+      <div className="p-6">
+        <div className="mb-5">
+          <h4 className="font-semibold text-white text-lg mb-2">Why this phone?</h4>
+          <p className={`${textColor} text-sm leading-relaxed`}>{phone.whyRecommended}</p>
+        </div>
+
+        {phone.specs && (
+          <div className="mb-5">
+            <h4 className="font-semibold text-white text-lg mb-2">Key Specs</h4>
+            <div className={`text-sm ${textColor} space-y-1.5`}>
+              {phone.specs.split(',').map((spec, i) => {
+                const [key, value] = spec.split(':').map(s => s.trim());
+                return (
+                  <div key={i} className="flex justify-between items-center">
+                    <span className="capitalize font-medium">{key}:</span>
+                    <span className={brandTextColor}>{value}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4 text-sm mb-6">
+          <div>
+            <h5 className="font-semibold text-green-400 text-base mb-1">Pros</h5>
+            <ul className={`${textColor} space-y-1`}>
+              {(phone.pros || []).slice(0, 3).map((pro, i) => (
+                <li key={i} className="text-xs flex items-start">
+                  <span className="mr-1 text-green-300">•</span> {pro}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h5 className="font-semibold text-red-400 text-base mb-1">Cons</h5>
+            <ul className={`${textColor} space-y-1`}>
+              {(phone.cons || []).slice(0, 2).map((con, i) => (
+                <li key={i} className="text-xs flex items-start">
+                  <span className="mr-1 text-red-300">•</span> {con}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        {isArchived ? (
+          <button
+            onClick={() => onRemove(phone.id)}
+            className="w-full py-3 px-4 bg-red-600/30 hover:bg-red-600/50 text-red-200 rounded-lg transition-all duration-300 hover:scale-105 flex items-center justify-center font-semibold border border-red-500/40 shadow-md hover:shadow-lg hover:shadow-red-500/30"
+          >
+            <Trash className="w-5 h-5 mr-2" />
+            Remove from Archive
+          </button>
+        ) : (
+          <button
+            onClick={() => onArchive(phone)}
+            disabled={phone.isArchived} // Assuming isArchived is a prop passed to the phone object for this button's state
+            className={`w-full py-3 px-4 rounded-lg transition-all duration-300 hover:scale-105 flex items-center justify-center font-semibold ${
+              phone.isArchived // Check against the phone object's archived status
+                ? 'bg-gray-500/20 text-gray-400 cursor-not-allowed border border-gray-400/30'
+                : 'bg-blue-600/30 hover:bg-blue-600/50 text-blue-200 border border-blue-500/40 shadow-md hover:shadow-lg hover:shadow-blue-500/30'
+            }`}
+          >
+            <Archive className="w-5 h-5 mr-2" />
+            {phone.isArchived ? 'Already Archived' : '📥 Archive'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+
 // Main App Component
 const App = () => {
   // State for form data and UI flow
@@ -96,43 +207,38 @@ const App = () => {
   useEffect(() => {
     const initFirebase = async () => {
       try {
-        // Retrieve Firebase config from the global environment variable
         const firebaseConfig = typeof __firebase_config !== 'undefined'
           ? JSON.parse(__firebase_config)
-          : {}; // Fallback if not defined (though it should be)
+          : {};
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        // Uncomment the line below if you plan to use Firestore for data persistence
-        // const db = getFirestore(app);
-
-        // Authenticate user with custom token or anonymously
+        
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
         } else {
           await signInAnonymously(auth);
         }
 
-        // Listen for authentication state changes to get the user ID
         const unsubscribe = onAuthStateChanged(auth, (user) => {
           if (user) {
-            setUserId(user.uid); // Set user ID if authenticated
+            setUserId(user.uid);
           } else {
-            setUserId(crypto.randomUUID()); // Assign a random ID if not authenticated
+            setUserId(crypto.randomUUID());
           }
-          setIsAuthReady(true); // Mark authentication as ready
+          setIsAuthReady(true);
         });
 
-        return () => unsubscribe(); // Clean up the auth listener on component unmount
+        return () => unsubscribe();
       } catch (e) {
         console.error("Firebase initialization or authentication error:", e);
         setError("Failed to initialize application. Please refresh and try again.");
-        setIsAuthReady(true); // Mark as ready even if there's an error to unblock UI
+        setIsAuthReady(true);
       }
     };
 
-    initFirebase(); // Call the Firebase initialization function
-  }, []); // Empty dependency array ensures this runs only once on mount
+    initFirebase();
+  }, []);
 
   // Effect to load archived phones from localStorage on component mount
   useEffect(() => {
@@ -234,8 +340,15 @@ const App = () => {
   const confirmArchive = () => {
     if (archiveDialog.phone) {
       // Add a unique ID to the archived phone for proper list rendering and removal
-      const phoneWithId = { ...archiveDialog.phone, id: Date.now() + Math.random() };
+      // Also mark it as archived for the button state
+      const phoneWithId = { ...archiveDialog.phone, id: Date.now() + Math.random(), isArchived: true };
       setArchivedPhones(prev => [...prev, phoneWithId]);
+      // Update the original recommendations to reflect the archived status
+      setRecommendations(prev => prev.map(rec =>
+        (rec.name === phoneWithId.name && rec.brand === phoneWithId.brand)
+          ? { ...rec, isArchived: true }
+          : rec
+      ));
       setToast({ message: `"${archiveDialog.phone.name}" archived successfully!`, type: 'success' });
     }
     closeArchiveDialog();
@@ -244,6 +357,12 @@ const App = () => {
   // Remove a phone from the archived list
   const removeFromArchive = (phoneId) => {
     setArchivedPhones(prev => prev.filter(phone => phone.id !== phoneId));
+    // Also update the original recommendations to unmark the archived status
+    setRecommendations(prev => prev.map(rec =>
+      (rec.id === phoneId) // Use the unique ID for removal from recommendations
+        ? { ...rec, isArchived: false }
+        : rec
+    ));
     setToast({ message: `Phone removed from archive.`, type: 'info' });
   };
 
@@ -286,8 +405,8 @@ Ensure all recommendations are within the specified budget and are models availa
       const payload = {
         contents: chatHistory,
         generationConfig: {
-          responseMimeType: "application/json", // Explicitly request JSON response
-          responseSchema: { // Define the expected JSON schema
+          responseMimeType: "application/json",
+          responseSchema: {
             type: "ARRAY",
             items: {
               type: "OBJECT",
@@ -295,7 +414,7 @@ Ensure all recommendations are within the specified budget and are models availa
                 name: { type: "STRING" },
                 brand: { type: "STRING" },
                 price: { type: "STRING" },
-                specs: { type: "STRING" }, // Specs as a single string
+                specs: { type: "STRING" },
                 whyRecommended: { type: "STRING" },
                 pros: {
                   type: "ARRAY",
@@ -305,8 +424,8 @@ Ensure all recommendations are within the specified budget and are models availa
                   type: "ARRAY",
                   items: { type: "STRING" }
                 },
-                rating: { type: "NUMBER" }, // Rating should be a number
-                brandImageUrl: { type: "STRING" } // New field for brand image URL
+                rating: { type: "NUMBER" },
+                brandImageUrl: { type: "STRING" }
               },
               required: ["name", "brand", "price", "specs", "whyRecommended", "pros", "cons", "rating", "brandImageUrl"]
             }
@@ -314,7 +433,6 @@ Ensure all recommendations are within the specified budget and are models availa
         }
       };
 
-      // YOUR API KEY IS DIRECTLY INCLUDED HERE AS PER YOUR REQUEST
       const apiKey = "YOUR_API_KEY";
       const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
@@ -333,7 +451,6 @@ Ensure all recommendations are within the specified budget and are models availa
       console.log("API Response Status:", response.status);
       console.log("API Response OK:", response.ok);
 
-      // Read the response body as text first for better debugging of malformed JSON
       const responseBodyText = await response.text();
       console.log("Raw API Response Body Text:", responseBodyText);
 
@@ -351,46 +468,43 @@ Ensure all recommendations are within the specified budget and are models availa
 
       let result;
       try {
-          result = JSON.parse(responseBodyText); // Parse the text as JSON
+          result = JSON.parse(responseBodyText);
       } catch (parseError) {
           throw new Error(`Failed to parse API response as JSON: ${parseError.message}. Raw: ${responseBodyText.substring(0, 200)}...`);
       }
 
       console.log("Parsed API Result Object:", result);
 
-      // Check if the response contains valid content parts
       if (result.candidates && result.candidates[0]?.content?.parts?.[0]?.text) {
         let responseText = result.candidates[0].content.parts[0].text;
         console.log("AI Generated Text (from parts[0].text):", responseText);
 
-        // Attempt to extract JSON using regex, in case the model adds extra text
         const jsonMatch = responseText.match(/\[[\s\S]*\]/);
         if (jsonMatch && jsonMatch[0].trim()) {
-          responseText = jsonMatch[0]; // Use the extracted JSON string
+          responseText = jsonMatch[0];
           console.log("Extracted JSON string:", responseText);
         } else if (!responseText.trim()) {
-          // If no JSON found and response is empty/whitespace
           throw new Error("AI response was empty or did not contain valid JSON. Please try again with different input.");
         } else {
-            // If responseText is not empty but no JSON array found, it's likely malformed
             throw new Error("AI response did not return a valid JSON array. Received: " + responseText.substring(0, 200) + "...");
         }
 
-        // Attempt to parse the extracted JSON string
         try {
           const parsedRecommendations = JSON.parse(responseText);
-          // Basic validation to ensure it's an array of objects with a 'name' property
           if (Array.isArray(parsedRecommendations) && parsedRecommendations.every(item => typeof item === 'object' && item !== null && 'name' in item)) {
-            setRecommendations(parsedRecommendations);
+            // Mark recommendations as archived if they are already in the archived list
+            const recommendationsWithArchivedStatus = parsedRecommendations.map(rec => ({
+              ...rec,
+              isArchived: isPhoneArchived(rec) // Check against the current archived list
+            }));
+            setRecommendations(recommendationsWithArchivedStatus);
           } else {
-            // If JSON is valid but not in expected structure, throw an error
             throw new Error("Received valid JSON, but it's not in the expected phone recommendation format.");
           }
         } catch (jsonErr) {
-          // Catch JSON parsing errors for the extracted string
           console.error('Failed to parse extracted JSON response:', jsonErr, 'Extracted response text:', responseText);
           setError('Failed to process AI response. The extracted JSON might be incomplete or malformed. Please try again or refine your input.');
-          setRecommendations([]); // Clear recommendations if parsing fails
+          setRecommendations([]);
         }
       } else {
         setError('No valid candidates or content received from the AI. This might indicate an issue with the AI generation itself.');
@@ -555,86 +669,13 @@ Ensure all recommendations are within the specified budget and are models availa
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-8 text-center drop-shadow-lg bg-gradient-to-r from-pink-400 to-purple-500 bg-clip-text text-transparent">📥 Your Archived Phones</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {archivedPhones.map((phone) => (
-                  <div key={phone.id} className="bg-gradient-to-br from-purple-900/80 to-indigo-900/80 backdrop-blur-sm rounded-3xl shadow-2xl overflow-hidden hover:shadow-3xl hover:shadow-purple-500/40 transition-all duration-500 hover:scale-[1.02] transform border border-purple-400/40">
-                    <div className="bg-gradient-to-r from-purple-600 to-indigo-700 p-6 text-white relative">
-                      <div className="absolute top-4 right-4 bg-purple-500/40 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide">
-                        ARCHIVED
-                      </div>
-                      <div className="flex items-center mb-4">
-                        <img
-                          src={phone.brandImageUrl || 'https://placehold.co/48x48/60A5FA/FFFFFF?text=PH'} // Use AI-provided URL or generic fallback
-                          alt={phone.brand}
-                          className="w-14 h-14 rounded-xl object-cover mr-4 border-2 border-white/30 shadow-md"
-                          onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/48x48/60A5FA/FFFFFF?text=PH'; }} // Fallback on error
-                        />
-                        <div>
-                          <h3 className="text-2xl font-bold mb-1">{phone.name}</h3>
-                          <p className="text-purple-100 text-lg">{phone.brand}</p>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center mt-3">
-                        <span className="text-3xl font-bold">{phone.price}</span>
-                        <span className="bg-white bg-opacity-20 px-4 py-1.5 rounded-full text-base flex items-center font-semibold">
-                          {phone.rating?.toFixed(1)}/10 ⭐
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="p-6">
-                      <div className="mb-5">
-                        <h4 className="font-semibold text-white text-lg mb-2">Why this phone?</h4>
-                        <p className="text-purple-200 text-sm leading-relaxed">{phone.whyRecommended}</p>
-                      </div>
-
-                      {/* Render specs from a string */}
-                      {phone.specs && (
-                        <div className="mb-5">
-                          <h4 className="font-semibold text-white text-lg mb-2">Key Specs</h4>
-                          <div className="text-sm text-purple-200 space-y-1.5">
-                            {phone.specs.split(',').map((spec, i) => {
-                              const [key, value] = spec.split(':').map(s => s.trim());
-                              return (
-                                <div key={i} className="flex justify-between items-center">
-                                  <span className="capitalize font-medium">{key}:</span>
-                                  <span className="text-purple-100">{value}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-2 gap-4 text-sm mb-6">
-                        <div>
-                          <h5 className="font-semibold text-green-400 text-base mb-1">Pros</h5>
-                          <ul className="text-purple-200 space-y-1">
-                            {(phone.pros || []).slice(0, 3).map((pro, i) => (
-                              <li key={i} className="text-xs flex items-start">
-                                <span className="mr-1 text-green-300">•</span> {pro}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                        <div>
-                          <h5 className="font-semibold text-red-400 text-base mb-1">Cons</h5>
-                          <ul className="text-purple-200 space-y-1">
-                            {(phone.cons || []).slice(0, 2).map((con, i) => (
-                              <li key={i} className="text-xs flex items-start">
-                                <span className="mr-1 text-red-300">•</span> {con}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => removeFromArchive(phone.id)}
-                        className="w-full py-3 px-4 bg-red-600/30 hover:bg-red-600/50 text-red-200 rounded-lg transition-all duration-300 hover:scale-105 flex items-center justify-center font-semibold border border-red-500/40 shadow-md hover:shadow-lg hover:shadow-red-500/30"
-                      >
-                        <Trash className="w-5 h-5 mr-2" />
-                        Remove from Archive
-                      </button>
-                    </div>
-                  </div>
+                  <PhoneCard
+                    key={phone.id}
+                    phone={phone}
+                    isArchived={true}
+                    onArchive={openArchiveDialog}
+                    onRemove={removeFromArchive}
+                  />
                 ))}
               </div>
             </div>
@@ -644,90 +685,14 @@ Ensure all recommendations are within the specified budget and are models availa
           <div>
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-8 text-center drop-shadow-lg bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">🔥 Fresh Recommendations</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {recommendations.map((phone, index) => (
-                <div key={index} className="bg-gradient-to-br from-blue-900/80 to-purple-900/80 backdrop-blur-sm rounded-3xl shadow-2xl overflow-hidden hover:shadow-3xl hover:shadow-blue-500/40 transition-all duration-500 hover:scale-[1.02] transform border border-blue-400/40">
-                  <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-6 text-white">
-                    <div className="flex items-center mb-4">
-                      <img
-                        src={phone.brandImageUrl || 'https://placehold.co/48x48/60A5FA/FFFFFF?text=PH'} // Use AI-provided URL or generic fallback
-                        alt={phone.brand}
-                        className="w-14 h-14 rounded-xl object-cover mr-4 border-2 border-white/30 shadow-md"
-                        onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/48x48/60A5FA/FFFFFF?text=PH'; }} // Fallback on error
-                      />
-                      <div>
-                        <h3 className="text-2xl font-bold mb-1">{phone.name}</h3>
-                        <p className="text-blue-100 text-lg">{phone.brand}</p>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center mt-3">
-                      <span className="text-3xl font-bold">{phone.price}</span>
-                      <span className="bg-white bg-opacity-20 px-4 py-1.5 rounded-full text-base flex items-center font-semibold">
-                        {phone.rating?.toFixed(1)}/10 ⭐
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="p-6">
-                    <div className="mb-5">
-                      <h4 className="font-semibold text-white text-lg mb-2">Why this phone?</h4>
-                      <p className="text-blue-200 text-sm leading-relaxed">{phone.whyRecommended}</p>
-                    </div>
-
-                    {/* Render specs from a string */}
-                    {phone.specs && (
-                      <div className="mb-5">
-                        <h4 className="font-semibold text-white text-lg mb-2">Key Specs</h4>
-                        <div className="text-sm text-blue-200 space-y-1.5">
-                          {phone.specs.split(',').map((spec, i) => {
-                            const [key, value] = spec.split(':').map(s => s.trim());
-                            return (
-                              <div key={i} className="flex justify-between items-center">
-                                <span className="capitalize font-medium">{key}:</span>
-                                <span className="text-blue-100">{value}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-4 text-sm mb-6">
-                      <div>
-                        <h5 className="font-semibold text-green-400 text-base mb-1">Pros</h5>
-                        <ul className="text-blue-200 space-y-1">
-                          {(phone.pros || []).slice(0, 3).map((pro, i) => (
-                            <li key={i} className="text-xs flex items-start">
-                              <span className="mr-1 text-green-300">•</span> {pro}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div>
-                        <h5 className="font-semibold text-red-400 text-base mb-1">Cons</h5>
-                        <ul className="text-blue-200 space-y-1">
-                          {(phone.cons || []).slice(0, 2).map((con, i) => (
-                            <li key={i} className="text-xs flex items-start">
-                              <span className="mr-1 text-red-300">•</span> {con}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => openArchiveDialog(phone)}
-                      disabled={isPhoneArchived(phone)}
-                      className={`w-full py-3 px-4 rounded-lg transition-all duration-300 hover:scale-105 flex items-center justify-center font-semibold ${
-                        isPhoneArchived(phone)
-                          ? 'bg-gray-500/20 text-gray-400 cursor-not-allowed border border-gray-400/30'
-                          : 'bg-blue-600/30 hover:bg-blue-600/50 text-blue-200 border border-blue-500/40 shadow-md hover:shadow-lg hover:shadow-blue-500/30'
-                      }`}
-                    >
-                      <Archive className="w-5 h-5 mr-2" />
-                      {isPhoneArchived(phone) ? 'Already Archived' : '📥 Archive'}
-                    </button>
-                  </div>
-                </div>
+              {recommendations.map((phone) => (
+                <PhoneCard
+                  key={phone.name + phone.brand} // Using name+brand as a key, assuming uniqueness for new recommendations
+                  phone={phone}
+                  isArchived={isPhoneArchived(phone)} // Pass the archived status to the card
+                  onArchive={openArchiveDialog}
+                  onRemove={removeFromArchive}
+                />
               ))}
             </div>
           </div>
