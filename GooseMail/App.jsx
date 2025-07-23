@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-
+// front of the code //
 const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
 const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? initialAuthToken : null;
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
