@@ -1,6 +1,8 @@
 # GooseMail 📧
-
 GooseMail is an advanced email validator that checks not only the format but also the **strength**, **readability**, and **professionalism** of an email address.
+<img width="1912" height="1742" alt="screencapture-vitejsvitexsq4nk7h-vbfp-5173-96435430-local-corp-webcontainer-io-2025-07-23-13_32_30" src="https://github.com/user-attachments/assets/11229c26-2183-4678-a1ff-9bee5c5e92a1" />
+
+<img width="1536" height="1024" alt="e07a3da3-5932-495e-9c55-83fe271c31fd" src="https://github.com/user-attachments/assets/9c8831a8-24a2-4d3b-9640-1fa6eff479ec" />
 
 ---
 
