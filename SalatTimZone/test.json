@@ -1,14 +1,12 @@
-jQuery(function($) {
-	 $.getJSON('https://muslimsalat.com/london/daily.json?key=API_KEY&jsoncallback=?', function (times)
-	 {
-		 $('.prayerTimesExample')
-		 .append('Today in '+times.title)
-		 .append(' Fajr: '+times.items[0].fajr)
-		 .append(' Dhuhr: '+times.items[0].dhuhr)
-		 .append(' Asr: '+times.items[0].asr)
-		 .append(' Maghrib: '+times.items[0].maghrib)
-		 .append(' Isha: '+times.items[0].isha)
-		 .append(' by MuslimSalat.com');
-	 });
-});
-		
+{
+  "title": "London, UK",
+  "items": [
+    {
+      "fajr": "04:45",
+      "dhuhr": "13:15",
+      "asr": "17:00",
+      "maghrib": "20:35",
+      "isha": "22:05"
+    }
+  ]
+}
