@@ -1,5 +1,8 @@
 # **SalatTimZone – Simple Prayer Time Finder**
 
+
+<img width="1912" height="962" alt="screencapture-localhost-4028-2025-08-11-23_58_33" src="https://github.com/user-attachments/assets/fb8acae3-392e-4164-8af5-48a81b8f510e" />
+
 ## **📌 Project Overview**
 
 SalatTimeZone is a lightweight and user-friendly web application designed to help Muslims quickly find today’s prayer times for any country.
