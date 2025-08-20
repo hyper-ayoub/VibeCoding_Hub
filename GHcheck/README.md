@@ -17,6 +17,8 @@ GHcheck analyzes GitHub profiles comprehensively by examining profile informatio
 
 ![GHcheck Interface](https://github.com/user-attachments/assets/67d0a9da-ad3b-49f6-8080-55904fcf9cbb)
 
+<img width="1912" height="1122" alt="screencapture-localhost-3000-2025-08-20-14_03_58" src="https://github.com/user-attachments/assets/100157bb-a6e4-45e9-ae81-205e88cecbee" />
+
 ## Installation
 
 1. Clone the repository
