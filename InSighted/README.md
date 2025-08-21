@@ -1,4 +1,4 @@
-#  InSighted 👔**
+#  InSighted 👔
 
 ## **1\. Project Overview**
 
