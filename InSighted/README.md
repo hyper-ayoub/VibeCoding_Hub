@@ -1,5 +1,7 @@
 #  InSighted 👔
 
+<img width="823" height="303" alt="image-removebg-preview__1_-Picsart-AiImageEnhancer-removebg-preview" src="https://github.com/user-attachments/assets/2f57fbfb-8ec5-4cc9-9e6e-9d3397bfbd34" />
+
 ## **1\. Project Overview**
 
 InSighted 👔 is an AI-powered tool that evaluates LinkedIn profiles and provides detailed analysis, professional scoring, and personalized improvement suggestions.
