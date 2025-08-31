@@ -4,7 +4,7 @@
 
 ## **1\. Project Overview**
 
-InSighted 👔 is an AI-powered tool that evaluates LinkedIn profiles and provides detailed analysis, professional scoring, and personalized improvement suggestions.
+InSighted 👔 is an AI-powered tool that evaluates LinkedIn profiles and provides detailed analysis, professional scoring, and personalized improvement suggestions
 
 The goal is to help students, job seekers, and professionals optimize their LinkedIn presence and improve career opportunities.
 
@@ -55,7 +55,7 @@ This MVP is designed as a demo web app where users can input a LinkedIn profile 
 ### **🔹 APIs & Tools**
 
 * PhantomBuster (phantombuster.com) – LinkedIn profile scraping  
-* OpenAI API ([platform.openai.com](https://platform.openai.com/)) – AI analysis & suggestions
+* OpenAI API ([platform.openai.com](https://platform.openai.com/)) – AI analysis & suggestions and improvement
 
 ### **🔹 Deployment**
 
