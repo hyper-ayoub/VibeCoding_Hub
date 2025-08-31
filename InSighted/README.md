@@ -167,6 +167,7 @@ Since this is an MVP:
 * 🎯 Collect user feedback on report quality.  
 * 🎯 Validate if users would pay for premium features (PDF reports, unlimited profiles).
 
+
 ---
 
 ## **12\. Conclusion**
