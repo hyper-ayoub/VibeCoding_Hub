@@ -1,5 +1,3 @@
-AI for Developers II Average: 86.67%
-
 ![](https://lh3.googleusercontent.com/d/1CDe_ePi6cGYsvByksOPCub_F8RcuNGst)
 
 ### 🏁 Capstone Project: Build with AI Intentionally
@@ -82,5 +80,6 @@ If you enjoyed working on the next.js polling app , feel free to improve it and 
 Use AI smartly. Prompt with context. Document with care. Push with intention.
 
 Let’s build.
+
 
 Copyright © 2025 ALX, All rights reserved.
